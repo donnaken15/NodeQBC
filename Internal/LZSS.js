@@ -1,9 +1,9 @@
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // TONY HAWK LZSS COMPRESSION ALGORITHM
 // Javascript-converted version of QueenBee's code
 //
 // https://github.com/Nanook/Queen-Bee/blob/master/QueenBeeParser/Qb/Lzss.cs
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +15,7 @@ const NIL = N;					/* A "NULL" value, it can be N since the ring buffer can't re
 
 class LZSSHandler
 {
-	constructor() 
+	constructor()
 	{
 		this._text_buf = new Uint8Array(N + F - 1);
 		this._lson = new Uint16Array(N + 1);
@@ -24,7 +24,7 @@ class LZSSHandler
 		this._match_position = 0;
 		this._match_length = 0;
 	}
-	
+
 	//-------------------------
 	// Read a byte from data
 	//-------------------------
@@ -32,67 +32,67 @@ class LZSSHandler
 	{
 		var byte = this.data[this.off] & 0xFF;
 		this.off ++;
-		
+
 		return byte;
 	}
-	
+
 	//-------------------------
 	// DECOMPRESS A FILE
 	//-------------------------
-	
+
 	Decompress(filename)
 	{
 		this.file = filename;
-		
+
 		var spl = filename.split(".");
 		spl.push('decompressed');
 		this.fileOut = spl.join(".");
-		
+
 		fs.readFile(filename, (err, data) => {
 			if (err)
 				return console.log(err);
-				
+
 			this.data = data;
 			var result = this.DecompressData();
-			
+
 			fs.writeFile(this.fileOut, result.buf, err => {
 				console.log("Written!");
 			});
 		});
 	}
-	
+
 	//-------------------------
 	// Decompress bytes
 	//-------------------------
-	
+
 	DecompressBytes(data, detectHeader = false)
 	{
 		this.data = data;
-		
+
 		if (detectHeader)
 		{
 			var magic = this.data.slice(0, 4).toString();
 			if (magic == 'LZSS')
 				this.data = this.data.slice(8, this.data.length);
 		}
-		
+
 		var res = this.DecompressData();
-		
+
 		if (!res.buf)
 			return {error: "Something went wrong."}
-			
+
 		return {result: res.buf};
 	}
-	
-	
+
+
 	//-------------------------
 	// ACTUALLY DECOMPRESS THE DATA
 	//-------------------------
-	
+
 	DecompressData()
 	{
 		var output = [];
-		
+
 		var i, j, k, r, c;
 		var flags;
 
@@ -104,11 +104,11 @@ class LZSSHandler
 
 		r = N - F;
 		flags = 0;
-		
+
 		this.off = 0;
 
 		var decompressedSize = 0;
-		
+
 		while (this.off < this.data.length)
 		{
 			/* Get the "flags" for the next 8 bytes */
@@ -156,56 +156,56 @@ class LZSSHandler
 				}
 			}
 		}
-		
+
 		var outputBuffer = Buffer.from(output);
-		
+
 		return {size: decompressedSize, buf: outputBuffer};
 	}
-	
+
 	//-------------------------
 	// COMPRESS A FILE
 	//-------------------------
-	
+
 	Compress(filename)
 	{
 		this.file = filename;
-		
+
 		var spl = filename.split(".");
 		spl.push('compressed');
 		this.fileOut = spl.join(".");
-		
+
 		fs.readFile(filename, (err, data) => {
 			if (err)
 				return console.log(err);
-				
+
 			this.data = data;
 			var result = this.CompressData();
-			
+
 			fs.writeFile(this.fileOut, result.buf, err => {
 				console.log("Written!");
 			});
 		});
 	}
-	
+
 	//-------------------------
 	// COMPRESS BYTES
 	//-------------------------
-	
+
 	CompressBytes(bytes)
 	{
 		this.data = bytes;
 		return {result: this.CompressData().buf};
 	}
-	
+
 	//-------------------------
 	// ACTUALLY COMPRESS THE DATA
 	//-------------------------
-	
+
 	CompressData()
 	{
 		this.off = 0;
 		var output = [];
-		
+
 		var compressedSize = 0;
 
 		/* Compression managers, buffers and trees */
@@ -213,9 +213,9 @@ class LZSSHandler
 		var c;
 		var code_buf = new Uint8Array(17);
 		var mask;
-		
+
 		mask = 1;
-		
+
 		/* Initialize trees */
 		this.InitTree();
 
@@ -223,7 +223,7 @@ class LZSSHandler
 		 * code_buf[0] works as eight flags, "1" representing that the unit
 		 * is an unencoded letter (1 byte), "0" a position-and-length pair
 		 * (2 bytes).  Thus, eight units require at most 16 bytes of code. */
-		 
+
 		code_buf[0] = 0;
 
 		/* mask contains the LZSS flag for the "unencoded" bytes.
@@ -231,19 +231,19 @@ class LZSSHandler
 		 * in every iteratorion of the compression algorithm. Since it's a
 		 * 8-bit value, it will be 0 after 8 shiftings, in that case, the code
 		 * buffer will be written, and the mask set to 1 again */
-		 
+
 		code_buf_ptr = mask;
 		s = 0;
 		r = N - F;
-		
+
 		/* Clear the buffer with any
 		 * character that will appear often */
-		
+
 		for (i = s; i < r; i++)
 			this._text_buf[i] = 0x20;
 
 		/* Read initial bytes! */
-		
+
 		for (len = 0; len < F; len++)
 		{
 			/* Check if it's EOF */
@@ -252,7 +252,7 @@ class LZSSHandler
 
 			/* Get byte */
 			c = this.ReadByte();
-			
+
 			/* Read F bytes into the last F bytes of the buffer */
 			this._text_buf[r + len] = c;
 		}
@@ -260,18 +260,18 @@ class LZSSHandler
 		/* Text of size 0? */
 		if (len == 0)
 			return 0;
-			
+
 		/* Insert the F strings, each of which begins with
 		 * one or more 'space' characters. Note the order in which these
 		 * strings are inserted. This way, degenerate trees will be less
 		 * likely to occur. */
-		 
+
 		for (i = 1; i <= F; i++)
 			this.InsertNode(r - i);
 
 		/* Finally, insert the whole string just read. The
 		 * global variables match_length and match_position are set. */
-		 
+
 		this.InsertNode(r);
 
 		/* Compress the remaining part of the file */
@@ -285,7 +285,7 @@ class LZSSHandler
 			if (this._match_length <= THRESHOLD) /* Not long enough match. Send one byte. */
 			{
 				this._match_length = 1;
-				code_buf[0] |= mask & 0xFF;  /* 'Send one byte' flag */
+				code_buf[0] |= mask & 0xFF;	 /* 'Send one byte' flag */
 
 				code_buf[code_buf_ptr++] = this._text_buf[r];  /* Send uncoded. */
 			}
@@ -296,7 +296,7 @@ class LZSSHandler
 			}
 
 			mask = (mask << 1) & 0xFF;
-			
+
 			if (mask == 0) /* Shift mask left one bit. */
 			{
 				/* Time to send the bytes in the buffer to the file! */
@@ -319,7 +319,7 @@ class LZSSHandler
 				/* Check if it's EOF */
 				if (this.off == this.data.length)
 					break;
-					
+
 				/* Get byte */
 				c = this.ReadByte();
 
@@ -357,7 +357,7 @@ class LZSSHandler
 					this.InsertNode(r);
 			}
 		}
-		
+
 		while (len > 0);
 
 		/* Write remaining bytes */
@@ -373,12 +373,12 @@ class LZSSHandler
 
 		return {size: compressedSize, buf: Buffer.from(output)};
 	}
-	
+
 	//-------------------------
 	// INITIALIZE TREES
 	//-------------------------
-	
-	InitTree()  
+
+	InitTree()
 	{
 		var i;
 
@@ -388,7 +388,7 @@ class LZSSHandler
 		NIL (= N), which stands for 'not used.'
 		For i = 0 to 255, rson[N + i + 1] is the root of the tree
 		for strings that begin with character i.  These are initialized
-		to NIL.  Note there are 256 trees. */
+		to NIL.	 Note there are 256 trees. */
 
 		for (i = N + 1; i <= N + 256; i++)
 			this._rson[i] = NIL;
@@ -396,11 +396,11 @@ class LZSSHandler
 		for (i = 0; i < N; i++)
 			this._dad[i] = NIL;
 	}
-	
+
 	//-------------------------
 	// INSERT A NODE
 	//-------------------------
-	
+
 	InsertNode(r)
 	{
 		var i, p, cmp;
@@ -444,7 +444,7 @@ class LZSSHandler
 					return;
 				}
 			}
-			
+
 			for (i = 1; i < F; i++)
 			{
 				if ((cmp = this._text_buf[key + i] - this._text_buf[p + i]) != 0)
@@ -473,11 +473,11 @@ class LZSSHandler
 		/* Remove p */
 		this._dad[p] = NIL;
 	}
-	
+
 	//-------------------------
 	// DELETE A NODE
 	//-------------------------
-	
+
 	DeleteNode(p)
 	{
 		var q;

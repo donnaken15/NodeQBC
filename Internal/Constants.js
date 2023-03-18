@@ -9,18 +9,18 @@ module.exports = {
 	Reader: require('./Reader.js'),
 	Writer: require('./Writer.js'),
 	Keys: new (require('./Keys.js'))(),
-    LZSS: new (require('./LZSS.js'))(),
-	
+	LZSS: new (require('./LZSS.js'))(),
+
 	FLAG_HASPARENT: 0x01,
 	FLAG_GLOBALITEM: 0x20,
 	FLAG_GLOBALITEM_WPC: 0x04,
 	FLAG_STRUCT_GH3: 0x80,
 	FLAG_STRUCT_WPC: 0x10,
-    
-    GAME_GHWT: 0,
-    GAME_GH3: 1,
-    GAME_THAW: 2,
-	
+
+	GAME_GHWT: 0,
+	GAME_GH3: 1,
+	GAME_THAW: 2,
+
 	ClassBindings: {
 		0x00: 'Floats',
 		0x01: 'Integer',
@@ -36,7 +36,7 @@ module.exports = {
 		0x1A: 'Pointer',
 		0x1C: 'LocalString'
 	},
-	
+
 	TypeBindings: {
 		'Floats': 0x00,
 		'Integer': 0x01,
@@ -52,9 +52,9 @@ module.exports = {
 		'Pointer': 0x1A,
 		'LocalString': 0x1C
 	},
-	
+
 	//----------------------------------
-	
+
 	ESCRIPTTOKEN_ENDOFFILE: 0x00,
 	ESCRIPTTOKEN_ENDOFLINE: 0x01,
 	ESCRIPTTOKEN_ENDOFLINENUMBER: 0x02,
