@@ -173,6 +173,8 @@ class QBScriptSwitch extends ItemCore
 	WriteText()
 	{
 		this.job.AddText("switch ");
+		this.job.AddIndent();
+		this.job.AddIndent();
 	}
 
 	//-----------------------
@@ -186,6 +188,8 @@ class QBScriptSwitch extends ItemCore
 
 		super.PostWriteText();
 
+		this.job.SubIndent();
+		this.job.SubIndent();
 		this.job.AddText("endswitch");
 	}
 
