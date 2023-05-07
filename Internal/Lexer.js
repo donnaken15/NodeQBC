@@ -62,6 +62,11 @@ class QBCLexer
 		this.inString = false;
 		this.ignoreSpaces = false;
 
+		// Are we in a long keyword?
+		// This is similar to a string, except
+		// it winds up being a QBKey.
+		this.inLongKey = false;
+
 		// The string we're in should be handled as a wide string.
 		this.inWideString = false;
 
@@ -235,6 +240,16 @@ class QBCLexer
 			}
 		}
 
+		// Sanitary check for quotation marks.
+		if (tokenType == "wstring" || tokenType == "string")
+		{
+			if (tokenValue.indexOf("\"") >= 0)
+			{
+				this.Fail("A string should NEVER have quotation marks inside of it. Please use double apostrophes. (" + tokenValue + ")");
+				return;
+			}
+		}
+
 		var token = this.AddToken(tokenType, tokenValue);
 
 		this.ResetToken();
@@ -334,7 +349,22 @@ class QBCLexer
 			if (this.commentType == COMMENT_LINE)
 			{
 				if (chr == '\n' || chr == '\r')
+				{
 					this.commentType = COMMENT_NONE;
+
+					// If our previous token was a newline, then this
+					// means that this line BEGINS with the comment. If not,
+					// then it began with something else, and we should treat
+					// it as the end of line for our previous code.
+
+					var last = this.LastToken();
+
+					if (last)
+					{
+						if (last.type !== "newline" && !this.TopLevel())
+							this.AddToken('newline', "");
+					}
+				}
 			}
 
 			// -- BLOCK COMMENT --
@@ -363,6 +393,18 @@ class QBCLexer
 
 			if (!this.TopLevel())
 				this.AddToken('newline', "");
+		}
+
+		// Parse grave mark (important for long key checks)
+		else if (chr == '`')
+		{
+			if (this.inLongKey)
+			{
+				this.FinalizeToken();
+				this.inLongKey = false;
+			}
+			else
+				this.inLongKey = true;
 		}
 
 		// Parse quotes (important for string checks)
@@ -402,29 +444,10 @@ class QBCLexer
 
 					if (chr == this.stringCap)
 					{
-						var wasEscape = this.currentToken[this.currentToken.length-1] == '\\';
-
-						// Do not allow escaped quotation marks, EVER!
-						// Neversoft specifically does not allow this, their font has no glyph for it
-
-						if (wasEscape && this.currentToken.indexOf("\"") >= 0)
-						{
-							this.Fail("Please do not use quotation marks in strings: " + this.currentToken + "");
-							return;
-						}
-
-						// Escape character needs the final slash replaced with the real character.
-						if (wasEscape)
-							this.currentToken = this.currentToken.slice(0, -1) + chr;
-
-						// Otherwise, it's not escaped! Actually end it!
-						else
-						{
-							this.FinalizeToken();
-							this.inWideString = false;
-							this.inString = false;
-							this.stringCap = null;
-						}
+						this.FinalizeToken();
+						this.inWideString = false;
+						this.inString = false;
+						this.stringCap = null;
 					}
 
 					// Otherwise, treat it as a normal character.
@@ -434,8 +457,54 @@ class QBCLexer
 			}
 		}
 
-		// If we're in a string, just add the character
-		else if (this.inString)
+		// Parse backslash (Important!)
+		else if (chr == '\\')
+		{
+			var nextChar = (this.text[this.offset+1] || "");
+
+			// Struct, this is an inline packed struct
+			if (nextChar == "{")
+			{
+				this.AddToken("\\{", "", true);
+				this.offset ++;
+			}
+
+			else if (nextChar == "\"")
+			{
+				this.Fail("Please do not use quotation marks in strings. Our font does not support this.");
+				return;
+			}
+
+			else if (nextChar == "'")
+			{
+				// Would have ended our string, but it's escaped.
+				if (this.inString && nextChar == this.stringCap)
+				{
+					this.currentToken += nextChar;
+					this.offset ++;
+				}
+				else
+				{
+					this.Fail("There is no need to escape an apostrophe. Please use single ' without slash.");
+					return;
+				}
+			}
+
+			// If next character is also backslash, then let's
+			// add it to our string.
+
+			else if (nextChar == '\\')
+			{
+				this.currentToken += chr;
+				this.offset ++;
+			}
+
+			else
+				this.currentToken += chr;
+		}
+
+		// If we're in a string, or long key, just add the character
+		else if (this.inString || this.inLongKey)
 			this.currentToken += chr;
 
 		// Otherwise, actually parse the token!
@@ -517,25 +586,6 @@ class QBCLexer
 					// Single |, no bitwise OR yet
 					else
 						this.AddToken('||', '', true);
-
-					break;
-
-				// Escape character!
-				case '\\':
-					var nextChar = (this.text[this.offset+1] || "");
-
-					// Struct, this is an inline packed struct
-					if (nextChar == "{")
-					{
-						this.AddToken("\\{", "", true);
-						this.offset ++;
-					}
-
-					else
-					{
-						this.Fail("Unknown character after escape code: " + nextChar);
-						return;
-					}
 
 					break;
 
@@ -714,11 +764,6 @@ class QBCLexer
 						return;
 					}
 
-					break;
-
-				// ` character, used for QBKeys with spaces
-				case '`':
-					this.ignoreSpaces = !this.ignoreSpaces;
 					break;
 
 				// LESS THAN OR GREATER THAN

@@ -44,7 +44,27 @@ class QBCQBKey extends ItemCore
 
 		var valstr = this.GetValueText( QBC.KeyToString(this.value.toString()) );
 
-		this.job.AddText(isArg ? ("<" + valstr + ">") : valstr);
+		if (isArg)
+			this.job.AddText("<" + valstr + ">");
+
+		else
+		{
+			// Write a decently sanitized QBKey.
+			// Some scenarios should PROBABLY have the key written
+			// as a long QBKey for safety. Ex: Paths
+
+			var as_longkey = false;
+
+			if (valstr.indexOf(".") >= 0)
+				as_longkey = true;
+			if (valstr.indexOf('\\') >= 0)
+				as_longkey = true;
+
+			if (as_longkey)
+				this.job.AddText("`" + valstr + "`");
+			else
+				this.job.AddText(valstr);
+		}
 
 		if (this.CanAutoCreateNewlines())
 			this.job.AddLine();
