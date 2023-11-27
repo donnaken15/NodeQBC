@@ -241,6 +241,7 @@ class QBCLexer
 		}
 
 		// Sanitary check for quotation marks.
+		if (false) // cope
 		if (tokenType == "wstring" || tokenType == "string")
 		{
 			if (tokenValue.indexOf("\"") >= 0)
@@ -469,13 +470,14 @@ class QBCLexer
 				this.offset ++;
 			}
 
-			else if (nextChar == "\"")
-			{
-				this.Fail("Please do not use quotation marks in strings. Our font does not support this.");
-				return;
-			}
+			//else if (nextChar == "\"")
+			//{
+			//	this.Fail("Please do not use quotation marks in strings. Our font does not support this.");
+			//	// shut up zedek
+			//	return;
+			//}
 
-			else if (nextChar == "'")
+			else if (nextChar == "'" || nextChar == "\"")
 			{
 				// Would have ended our string, but it's escaped.
 				if (this.inString && nextChar == this.stringCap)
