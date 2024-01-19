@@ -273,6 +273,9 @@ class QBCScriptToken extends ItemCore
 				break;
 
 			case "newline":
+				if (!this.writer.hasOwnProperty('line_nums')) // hacky
+					this.writer.line_nums = [];
+				this.writer.line_nums.push(this.writer.offset);
 				this.writer.UInt8(QBC.constants.ESCRIPTTOKEN_ENDOFLINE);
 				break;
 

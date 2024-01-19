@@ -129,6 +129,8 @@ class KeyHandler
 	{
 		this.keyDict = {};
 	}
+	
+	CRCTable = crc32_table;
 
 	//-----------------------
 	// Create key from text, or number!

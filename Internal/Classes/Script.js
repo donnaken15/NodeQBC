@@ -269,14 +269,43 @@ class QBCScript extends ItemCore
 		// Script end bytecode
 		this.writer.UInt8(QBC.constants.ESCRIPTTOKEN_KEYWORD_ENDSCRIPT);
 
-		// Reset writer back to what it was before!
-		this.SetWriter(this.job.writer);
-
 		// -------------------
 
 		this.Debug(this.id + " is " + dataWriter.buffer.length + " bytes long");
 
-		this.writer.UInt32(0xBABEFACE);						// Script CRC, fix later(?)
+		var oldReader = this.reader;
+
+		const minus1 = 0xFFFFFFFFn;
+		// thx addy
+		this.checksum = minus1;
+		var chksmGen = new QBC.constants.Reader(dataWriter.buffer);
+		chksmGen.LE = true;
+		this.SetReader(chksmGen);
+		
+		// ScriptToken.js:275
+		var current_line = 0;
+		while (this.ReadAllowed() && this.reader.offset < this.reader.buf.length - 1)
+		{
+			var byte = this.reader.UInt8();
+			//process.stdout.write('\x1b[9' + (this.reader.offset - 1 !== this.writer.line_nums[current_line] ? 0:1)+'m');
+			if (this.reader.offset - 1 !== this.writer.line_nums[current_line])
+			{
+				this.checksum = (this.checksum >> 8n) ^ BigInt(QBC.constants.Keys.CRCTable[(this.checksum^BigInt(byte)) & 0xFFn]);
+			}
+			else
+				current_line++;
+			//process.stdout.write(byte.toString(16).padStart(2,'0')+' ');
+		}
+		//process.stdout.write("\x1b[0m");
+
+		//console.log(this.checksum.toString(16));
+
+		// Restore old reader
+		this.SetReader(oldReader);
+
+		// Reset writer back to what it was before!
+		this.SetWriter(this.job.writer);
+		this.writer.UInt32(parseInt(this.checksum & minus1));						// Script CRC
 
 		// -------------------
 
