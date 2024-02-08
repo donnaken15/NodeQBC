@@ -310,7 +310,7 @@ class QBCJob
 
 	TabbedDebug(txt)
 	{
-		var idt = "".padStart(this.GetIndent() * 2, " ");
+		var idt = " ".repeat(this.GetIndent() * 2);
 		this.Debug(idt + txt);
 
 		return (idt + txt);
