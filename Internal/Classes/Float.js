@@ -39,7 +39,7 @@ class QBCFloat extends ItemCore
 		if (!extra)
 			finalString = basis.toString();
 		else
-			finalString = this.value.toFixed(7).replace(/^|0+$/g, '');;
+			finalString = this.value.toPrecision(6).toString().replace(/^|0+$/g, '');;
 
 		// Ensure it's a decimal
 		if (finalString.indexOf(".") == -1)

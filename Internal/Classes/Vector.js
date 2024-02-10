@@ -107,9 +107,8 @@ class QBCVector extends ItemCore
 
 		// "Floats" object type
 		this.writer.UInt32(0x00010000);
-		this.writer.Float(this.values[0]);
-		this.writer.Float(this.values[1]);
-		this.writer.Float(this.values[2]);
+		for (var i = 0; i < 3; i++)
+			this.writer.Float(this.values[i]);
 	}
 }
 

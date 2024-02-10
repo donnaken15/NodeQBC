@@ -45,12 +45,45 @@ class QBCScript extends ItemCore
 
 	Read()
 	{
+		// THUG script? This is different from PAK items.
+		if (this.job.IsTHUG())
+		{
+			// This SHOULD be 0x16.
+			var magicToken = this.reader.UInt8();
+
+			if (magicToken != QBC.constants.ESCRIPTTOKEN_NAME)
+			{
+				this.Fail("Script token was not followed by 0x" + QBC.constants.ESCRIPTTOKEN_NAME.toString(16).padStart(2, "0") + ".");
+				return;
+			}
+
+			this.id = QBC.constants.Keys.FromKey("0x" + this.reader.UInt32().toString(16).padStart(8, "0"));
+
+			while (this.ReadAllowed())
+				this.ReadScriptToken();
+
+			this.Finalize();
+			return;
+		}
+
 		this.ReadSharedProperties();
 		this.reader.Seek(this.ptr_scriptStart);
 
-		this.data_crc = this.reader.UInt32();
-		this.size_uncompressed = this.reader.UInt32();
-		this.size_compressed = this.reader.UInt32();
+		// Literal top-line script.
+		if (!(this.flags & QBC.constants.FLAG_HASPARENT))
+		{
+			this.data_crc = this.reader.UInt32();
+			this.size_uncompressed = this.reader.UInt32();
+			this.size_compressed = this.reader.UInt32();
+		}
+
+		// StructScript. Size isn't explicitly defined.
+		else
+		{
+			this.data_crc = 0;
+			this.size_uncompressed = this.ptr_nextItem - this.ptr_scriptStart;
+			this.size_compressed = this.ptr_nextItem - this.ptr_scriptStart;
+		}
 
 		var isCompressed = true;
 		var size_to_use = this.size_compressed;
@@ -62,6 +95,9 @@ class QBCScript extends ItemCore
 		}
 
 		this.script_data = this.reader.Chunk(size_to_use);
+
+		// Skip to nearest 4 bytes.
+		this.reader.SkipToNearest(4);
 
 		if (isCompressed)
 		{
@@ -114,8 +150,11 @@ class QBCScript extends ItemCore
 	{
 		var idText = this.GetValueText(this.GetID());
 
-		this.job.AddLine();
-		this.job.AddText("script " + idText);
+		// Do not beautify in structs.
+		if (!this.InStruct())
+			this.job.AddLine();
+
+		this.job.AddText("script " + idText + " ");
 		this.job.AddIndent();
 	}
 
@@ -129,6 +168,12 @@ class QBCScript extends ItemCore
 
 		if (this.job.Failed())
 			return;
+
+		if (this.job.IsTHUG())
+		{
+			this.job.SubIndent();
+			this.job.AddText("endscript");
+		}
 
 		this.job.AddLine();
 	}
@@ -281,8 +326,8 @@ class QBCScript extends ItemCore
 		var chksmGen = new QBC.constants.Reader(dataWriter.buffer);
 		chksmGen.LE = true;
 		this.SetReader(chksmGen);
-		
-		// ScriptToken.js:275
+
+		// ScriptToken.js:284
 		var current_line = 0;
 		while (this.ReadAllowed() && this.reader.offset < this.reader.buf.length - 1)
 		{

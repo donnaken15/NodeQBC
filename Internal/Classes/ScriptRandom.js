@@ -65,7 +65,7 @@ class QBScriptRandom extends ItemCore
 		if (!token)
 		{
 			this.Fail("Ran out of tokens?");
-			return false;
+			return;
 		}
 
 		if (token.type == "(")
@@ -363,6 +363,15 @@ class QBScriptRandom extends ItemCore
 					qbItem.value = "@"
 					qbItem.weight = weightValue;
 					this.AddChild(qbItem);
+
+					// This is a gross hack and should basically never happen
+					// if you are a sensible human being. Why would you
+					// make a Random and only have one item? Neversoft does this
+					// in GHWT, in drum_training_int_tutorial. In the entirety
+					// of GHWT code, this is the only time that this happens.
+
+					if (numMarkers == 1)
+						return;
 				}
 			}
 
@@ -448,12 +457,12 @@ class QBScriptRandom extends ItemCore
 		}
 
 		this.AddText(" (");
-			this.AddIndent();
+		this.AddIndent();
 
-			for (const child of this.children)
-				child._WriteText();
+		for (const child of this.children)
+			child._WriteText();
 
-			this.SubIndent();
+		this.SubIndent();
 
 		this.AddText(")");
 		this.AddInlineSpace();

@@ -74,42 +74,48 @@ class QBCStruct extends ItemCore
 	// single-line object?
 	//-----------------------
 
-	IsSingleLine()
-	{
-		if (this.children.length <= 0)
-			return true;
-
-		// If we have one multi-line child, return false
-		for (const child of this.children)
-		{
-			if (!child.IsSingleLine())
-				return false;
-		}
-
-		return true;
-	}
+	IsSingleLine() { return false; }
 
 	//-----------------------
 	// Internal write, DO NOT CALL
 	//-----------------------
 	_WriteText()
 	{
-		var singleLine = this.IsSingleLine();
+		var singleLine = this.HasOnlySingleLineChildren();
 
 		this.WriteIDString();
 
-		this.AddText("{");
-			this.AddIndent();
+		// Empty struct.
+		if (this.children.length <= 0)
+			this.AddText("{}");
 
-			if (this.CanAutoCreateNewlines())
-				this.AddLine();
+		// Plain multi-line struct.
+		else if (!singleLine)
+		{
+			this.AddText("{");
+				this.AddIndent();
+
+				if (this.CanAutoCreateNewlines())
+					this.AddLine();
+
+				for (const child of this.children)
+					child._WriteText();
+
+				this.SubIndent();
+
+			this.AddText("}");
+		}
+
+		// Beautiful single line struct.
+		else
+		{
+			this.AddText("{ ");
 
 			for (const child of this.children)
 				child._WriteText();
 
-			this.SubIndent();
-
-		this.AddText("}");
+			this.AddText(" }");
+		}
 
 		if (this.CanAutoCreateNewlines())
 			this.AddLine();

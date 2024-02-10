@@ -143,49 +143,58 @@ class QBCArray extends ItemCore
 	// single-line object?
 	//-----------------------
 
-	IsSingleLine()
-	{
-		if (this.children.length <= 0)
-			return true;
-
-		// If we have one multi-line child, return false
-		for (const child of this.children)
-		{
-			if (!child.IsSingleLine())
-				return false;
-		}
-
-		return true;
-	}
+	IsSingleLine() { return false; }
 
 	//-----------------------
 	// Internal write, DO NOT CALL
 	//-----------------------
 	_WriteText()
 	{
-		var singleLine = this.IsSingleLine();
+		var singleLine = this.HasOnlySingleLineChildren();
 
 		this.WriteIDString();
 
-		this.job.AddText("[");
+		// Empty array.
+		if (this.children.length <= 0)
+			this.AddText("[]");
+
+		// Plain multi-line struct.
+		else if (!singleLine)
+		{
+			this.AddText("[");
+
+				if (this.children.length > 0)
+				{
+					this.job.AddIndent();
+
+					if (this.CanAutoCreateNewlines())
+						this.AddLine();
+
+					for (const child of this.children)
+						child._WriteText();
+
+					this.job.SubIndent();
+				}
+
+			this.job.AddText("]");
+		}
+
+		// Beautiful single line array.
+		else
+		{
+			this.AddText("[ ");
 
 			if (this.children.length > 0)
 			{
-				this.job.AddIndent();
-
-				if (this.CanAutoCreateNewlines())
-					this.job.AddLine();
-
 				for (const child of this.children)
 					child._WriteText();
-
-				this.job.SubIndent();
 			}
 
-		this.job.AddText("]");
+			this.AddText(" ]");
+		}
 
 		if (this.CanAutoCreateNewlines())
-			this.job.AddLine();
+			this.AddLine();
 		else
 			this.AddInlineSpace();
 

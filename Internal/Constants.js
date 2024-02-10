@@ -16,10 +16,12 @@ module.exports = {
 	FLAG_GLOBALITEM_WPC: 0x04,
 	FLAG_STRUCT_GH3: 0x80,
 	FLAG_STRUCT_WPC: 0x10,
+	FLAG_WOR_ARRAY: 0x20,
 
 	GAME_GHWT: 0,
 	GAME_GH3: 1,
 	GAME_THAW: 2,
+	GAME_THUG2: 3,
 
 	ClassBindings: {
 		0x00: 'Floats',
@@ -34,7 +36,16 @@ module.exports = {
 		0x0C: 'Array',
 		0x0D: 'QBKey',
 		0x1A: 'Pointer',
-		0x1C: 'LocalString'
+		0x1C: 'LocalString',
+		0x24: 'RequiredValue',
+		0x25: 'RequiredValue',
+		0x26: 'RequiredValue',
+		0x27: 'RequiredValue',
+		0x28: 'RequiredValue',
+		0x29: 'RequiredValue',
+		0x2A: 'RequiredValue',
+		0x2B: 'RequiredValue',
+		0x2C: 'RequiredValue',
 	},
 
 	TypeBindings: {

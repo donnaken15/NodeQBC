@@ -1,13 +1,13 @@
 // ---------------------------------------------------
 //
-//		  NODE
-//		 ██████	 ██████	  ██████
-//		██	  ██ ██	  ██ ██
-//		██	  ██ ██████	 ██
-//		██ ▄▄ ██ ██	  ██ ██
-//		 ██████	 ██████	  ██████
-//			▀▀
-//				  Q B	C O M P I L E R
+//        NODE
+//       ██████  ██████   ██████
+//      ██    ██ ██   ██ ██
+//      ██    ██ ██████  ██
+//      ██ ▄▄ ██ ██   ██ ██
+//       ██████  ██████   ██████
+//          ▀▀
+//                Q B   C O M P I L E R
 //					 (And decompiler!)
 //
 // ---------------------------------------------------
@@ -41,7 +41,8 @@ class QBC
 		// Pull in our core key database.
 		// Regardless, we'll use the keys in our Keys folder first.
 
-		this.constants.Keys.PullKeys( path.join(__dirname, 'Keys') );
+		if (!options.noKeyFiles)
+			this.constants.Keys.PullKeys( path.join(__dirname, 'Keys') );
 
 		// List of currently active job
 		this.jobs = [];
@@ -79,7 +80,22 @@ class QBC
 		if (global.Checksums)
 			return Checksums.Lookup(key);
 
-		return key;
+		return this.constants.Keys.FromKey(key);
+	}
+
+	//-----------------------
+	// Add a checksum to symbol table.
+	//-----------------------
+
+	AddKey(key, text)
+	{
+		if (global.Checksums)
+		{
+			Checksums.AddKey(key, text);
+			return;
+		}
+
+		this.constants.Keys.AddKey(key, text);
 	}
 
 	//-----------------------

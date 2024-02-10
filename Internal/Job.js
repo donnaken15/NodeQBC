@@ -47,6 +47,31 @@ class QBCJob
 	}
 
 	//-----------------------
+	// Attempts to pull keys from
+	// a .dbg file, if the input file
+	// is a .qb file.
+	//
+	// inFile is a path.
+	//-----------------------
+
+	AttemptDbgPull(inFile)
+	{
+		var spl = inFile.split(".");
+		for (var s=0; s<spl.length; s++)
+		{
+			if (spl[s].toLowerCase() == "qb")
+				spl[s] = "dbg";
+		}
+
+		var dbgPath = spl.join(".");
+
+		if (!fs.existsSync(dbgPath))
+			return;
+
+		QBC.constants.Keys.PullDBGKeys(dbgPath);
+	}
+
+	//-----------------------
 	// Handle necessary file operations
 	//-----------------------
 
@@ -108,7 +133,11 @@ class QBCJob
 		}
 
 		if (inFile && inIsPath)
+		{
+			this.fileName = path.basename(inFile);
+			this.AttemptDbgPull(inFile);
 			this.data = fs.readFileSync(inFile);
+		}
 		else
 			this.data = inFile;
 
@@ -131,6 +160,7 @@ class QBCJob
 		this.taskOutput = null;
 		this.taskOptions = {};
 
+		this.data = null;
 		this.lexer = null;
 		this.SetIndent(0);
 		this.abort = false;
@@ -139,6 +169,7 @@ class QBCJob
 		this.output = "";
 		this.writer = null;
 		this.qbName = "0x00000000";
+		this.fileName = "";
 
 		// The game we're operating for.
 		this.gameType = QBC.constants.GAME_GHWT;
@@ -171,6 +202,9 @@ class QBCJob
 
 	Fail(reason = "")
 	{
+		if (this.fileName)
+			reason = "[" + this.fileName + "] " + reason;
+
 		if (reason)
 			this.Warn(reason, true);
 
@@ -213,7 +247,7 @@ class QBCJob
 		if (!this.SetGameTypeFromOptions())
 			return;
 
-		this.Debug("Job decompiling...");
+		this.Debug("Job decompiling for game " + this.gameType + "...");
 
 		this.PrepareFiles(inFile, outFile, opt);
 
@@ -221,6 +255,7 @@ class QBCJob
 			return;
 
 		this.reader = new QBC.constants.Reader(this.data);
+		this.reader.LE = (this.IsTHAW() || this.IsTHUG());
 
 		this.PerformDecompile(opt);
 
@@ -240,7 +275,7 @@ class QBCJob
 		if ((opt && opt.headerless) || (opt && opt.packedStruct))
 			isHeaderless = true;
 
-		if (!isHeaderless)
+		if (!this.IsTHUG() && !isHeaderless)
 		{
 			this.reader.UInt32();						// Zero
 
@@ -252,7 +287,9 @@ class QBCJob
 		}
 
 		// Main class which contains the entire code
-		if (opt && opt.packedStruct)
+		if (this.IsTHUG())
+			this.qbCore = QBC.CreateClass("THUGQB");
+		else if (opt && opt.packedStruct)
 			this.qbCore = QBC.CreateClass("Struct", {dataOnly: true});
 		else
 			this.qbCore = QBC.CreateClass("PakQB");
@@ -332,6 +369,7 @@ class QBCJob
 	IsGHWT() { return (this.gameType == QBC.constants.GAME_GHWT); }
 	IsGH3() { return (this.gameType == QBC.constants.GAME_GH3); }
 	IsTHAW() { return (this.gameType == QBC.constants.GAME_THAW); }
+	IsTHUG() { return (this.gameType == QBC.constants.GAME_THUG2); }
 
 	//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
@@ -363,7 +401,7 @@ class QBCJob
 
 	StartLine()
 	{
-		this.AddText("".padStart(this.GetIndent() * 4, " "));
+		this.AddText(" ".repeat(this.GetIndent() * 4));
 	}
 
 	//-----------------------
@@ -442,6 +480,7 @@ class QBCJob
 
 		// Prepare our writer, this is for our bytecode
 		this.writer = new QBC.constants.Writer();
+		this.writer.LE = (this.IsTHAW() || this.IsTHUG());
 
 		// Prepare input and output arguments appropriately
 		this.PrepareFiles(this.taskInput, this.taskOutput, this.taskOptions);
@@ -559,6 +598,10 @@ class QBCJob
 
 			case "thaw":
 				this.gameType = QBC.constants.GAME_THAW;
+				break;
+
+			case "thug2":
+				this.gameType = QBC.constants.GAME_THUG2;
 				break;
 
 			default:

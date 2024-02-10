@@ -115,6 +115,44 @@ class QBCLexer
 	TopLevel() { return (this.scriptDepth == 0); }
 
 	//-----------------------
+	// Is this string a float string?
+	// Make sure it actually is a float.
+	//-----------------------
+
+	IsFloatString(str)
+	{
+		for (var i=0; i<str.length; i++)
+		{
+			var ccd = str.charCodeAt(i);
+			if (ccd == 46 || ccd == 45 || (ccd >= 48 && ccd <= 57))
+				continue;
+
+			return false;
+		}
+
+		return true;
+	}
+
+	//-----------------------
+	// Is this string an int string?
+	// Make sure it actually is an int.
+	//-----------------------
+
+	IsIntString(str)
+	{
+		for (var i=0; i<str.length; i++)
+		{
+			var ccd = str.charCodeAt(i);
+			if (ccd == 45 || (ccd >= 48 && ccd <= 57))
+				continue;
+
+			return false;
+		}
+
+		return true;
+	}
+
+	//-----------------------
 	// Finalize whatever token we started
 	//-----------------------
 
@@ -137,7 +175,7 @@ class QBCLexer
 			var wasFloat = false;
 
 			// Has a period!
-			if (this.currentToken.indexOf(".") >= 0)
+			if (this.currentToken.indexOf(".") >= 0 && this.IsFloatString(this.currentToken))
 			{
 				var floatVal = parseFloat(this.currentToken);
 
@@ -149,7 +187,7 @@ class QBCLexer
 				}
 			}
 
-			if (!wasFloat)
+			if (!wasFloat && this.IsIntString(this.currentToken))
 			{
 				var intVal = parseInt(this.currentToken);
 				if (!isNaN(intVal))
@@ -470,14 +508,13 @@ class QBCLexer
 				this.offset ++;
 			}
 
-			//else if (nextChar == "\"")
-			//{
-			//	this.Fail("Please do not use quotation marks in strings. Our font does not support this.");
-			//	// shut up zedek
-			//	return;
-			//}
+			else if (nextChar == "\"")
+			{
+				this.Fail("Please do not use quotation marks in strings. Our font does not support this.");
+				return;
+			}
 
-			else if (nextChar == "'" || nextChar == "\"")
+			else if (nextChar == "'")
 			{
 				// Would have ended our string, but it's escaped.
 				if (this.inString && nextChar == this.stringCap)
@@ -506,7 +543,7 @@ class QBCLexer
 		}
 
 		// If we're in a string, or long key, just add the character
-		else if (this.inString || this.inLongKey)
+		else if (this.inString || this.inLongKey || this.ignoreSpaces)
 			this.currentToken += chr;
 
 		// Otherwise, actually parse the token!
@@ -900,7 +937,7 @@ class QBCLexer
 
 	PostReadValidate()
 	{
-		if (this.scriptDepth > 0)
+		if (this.scriptDepth != 0)
 		{
 			this.Fail("A script failed or was missing its endscript keyword.");
 			return;
@@ -1029,12 +1066,12 @@ class QBCLexer
 
 						else
 						{
-							// Outside of scripts, the ONLY () paremeters we
+							// Outside of scripts, the ONLY () things inside of () we
 							// should have are ints, floats, and ,
 
 							if (scrDepth == 0)
 							{
-								this.Fail("( found with ) and odd element inside: " + peekToken.type);
+								this.Fail("Top-level () found encasing element of type '" + peekToken.type + "': " + peekToken.value);
 								return;
 							}
 
@@ -1076,6 +1113,22 @@ class QBCLexer
 				}
 			}
 
+			// Default / switch token? If preceded or followed by a = then make it a keyword
+
+			else if (token.type == "default" || token.type == "switch")
+			{
+				var lastToken = this.tokens[t-1] || null;
+				var nextToken = this.tokens[t+1] || null;
+
+				if ((lastToken && lastToken.type == "=") || (nextToken && nextToken.type == "="))
+				{
+					var oldType = token.type;
+
+					token.type = "keyword";
+					token.value = oldType;
+				}
+			}
+
 			newTokens.push(token);
 			t ++;
 		}
@@ -1109,7 +1162,11 @@ class QBCLexer
 
 	GetTokenIndex() { return this.tokenIndex; }
 	CurrentToken() { return this.tokens[this.tokenIndex]; }
-	NextToken(gap = 1) { return this.tokens[this.tokenIndex+gap]; }
+	NextToken(gap = 1)
+	{
+		var tokIndex = this.tokenIndex+gap;
+		return (tokIndex >= 0 && tokIndex < this.tokens.length) ? this.tokens[tokIndex] : null;
+	}
 	LastToken() { return this.tokens[this.tokens.length-1]; }
 
 	//-----------------------

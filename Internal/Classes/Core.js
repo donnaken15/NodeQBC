@@ -5,6 +5,8 @@
 //
 // ---------------------------------------------------
 
+const MAX_SINGLE_LINE_ELEMENTS = 5;
+
 class QBCItemCore
 {
 	constructor(opt = {})
@@ -26,6 +28,7 @@ class QBCItemCore
 
 		// Internal item type
 		this.itemType = (opt && opt.item_type) || -1;
+		this.byteType = (opt && opt.byte_type) || 0;
 
 		// For reference
 		this.className = (opt && opt.className) || this.constructor.name;
@@ -243,7 +246,15 @@ class QBCItemCore
 
 		var valstr = val.toString();
 		if (valstr.indexOf(" ") >= 0 || valstr.startsWith("0x"))
-			return '#\"' + valstr + '"';
+		{
+			// Try to look it up just in case.
+			var lookup = QBC.KeyToString(valstr);
+
+			if (lookup == valstr)
+				return '#\"' + valstr + '"';
+
+			return lookup;
+		}
 
 		return valstr;
 	}
@@ -323,15 +334,46 @@ class QBCItemCore
 	}
 
 	//-----------------------
+	// Attempt to find the name
+	// of the script we're
+	// currently in.
+	//-----------------------
+
+	FindScriptName()
+	{
+		var item = this;
+
+		while (item)
+		{
+			if (item.IsScript())
+				return item.id;
+
+			item = item.parent;
+		}
+
+		return null;
+	}
+
+	//-----------------------
 	// Fail
 	//-----------------------
 
 	Fail(reason = "")
 	{
+		var finalReason = "";
+
 		if (this.reader)
-			this.job.Fail("(" + this.ptr_spawnOffset + ") " + this.GetClassName() + ": " + reason);
+			finalReason = "(@" + this.ptr_spawnOffset + ", @" + this.reader.Tell() + ") " + this.GetClassName() + ": " + reason;
 		else
-			this.job.Fail(this.GetClassName() + ": " + reason);
+			finalReason = this.GetClassName() + ": " + reason;
+
+		// Attempt to find the name of the script we're in.
+		var scriptName = this.FindScriptName();
+
+		if (scriptName)
+			finalReason = "[" + scriptName + "] " + finalReason;
+
+		this.job.Fail(finalReason);
 
 		this.stopRead = true;
 		this.stopUnlex = true;
@@ -376,6 +418,9 @@ class QBCItemCore
 
 	InScript()
 	{
+		if (this.job && this.job.IsTHUG())
+			return true;
+
 		if (this.IsPackedStruct())
 			return false;
 
@@ -472,22 +517,45 @@ class QBCItemCore
 		var info = {
 			byte_flags: itemFlags,
 			byte_type: itemType,
-			item_type: 0
+			item_type: 0,
+			wor_array: false
 		};
 
-		if (itemFlags & QBC.constants.FLAG_GLOBALITEM)
-			info.global_item = true;
+		// THAW-like.
+		if (this.job.IsTHAW())
+		{
+			if (itemFlags & QBC.constants.FLAG_GLOBALITEM_WPC)
+				info.global_item = true;
 
-		if (itemFlags & QBC.constants.FLAG_HASPARENT)
-			info.child_item = true;
+			if (itemFlags & QBC.constants.FLAG_HASPARENT)
+			{
+				info.child_item = true;
+				info.item_type = (itemFlags >> 1) || itemType;
+			}
+			else
+				info.item_type = itemType;
+		}
 
-		// If this is a special GH3 struct type, then
-		// we derive the item type from its flags.
-
-		if (itemFlags & QBC.constants.FLAG_STRUCT_GH3)
-			info.item_type = itemFlags & 0x7F;
+		// GH-like.
 		else
-			info.item_type = itemType;
+		{
+			if (itemFlags & QBC.constants.FLAG_GLOBALITEM)
+				info.global_item = true;
+
+			if (itemFlags & QBC.constants.FLAG_HASPARENT)
+				info.child_item = true;
+
+			if (itemType & QBC.constants.FLAG_WOR_ARRAY)
+				info.wor_array = true;
+
+			// If this is a special GH3 struct type, then
+			// we derive the item type from its flags.
+
+			if (itemFlags & QBC.constants.FLAG_STRUCT_GH3)
+				info.item_type = itemFlags & 0x7F;
+			else
+				info.item_type = itemType;
+		}
 
 		return info;
 	}
@@ -524,7 +592,15 @@ class QBCItemCore
 		this.id = QBC.constants.Keys.FromKey("0x" + this.reader.UInt32().toString(16).padStart(8, "0"));
 
 		// Top-most QB items have the filename of the QB
-		if (this.flags & QBC.constants.FLAG_GLOBALITEM)
+		var isTHAW = this.job.IsTHAW();
+
+		// In a structure? We will never have PAK ID.
+		if (isTHAW && this.flags & QBC.constants.FLAG_HASPARENT)
+			return;
+		if (this.job.IsGH3() && (this.flags & QBC.constants.FLAG_STRUCT_GH3))
+			return;
+
+		if ( ((this.flags & QBC.constants.FLAG_GLOBALITEM_WPC) && isTHAW) || ((this.flags & QBC.constants.FLAG_GLOBALITEM) && !isTHAW) )
 			this.filename = QBC.constants.Keys.FromKey("0x" + this.reader.UInt32().toString(16).padStart(8, "0"));
 	}
 
@@ -563,7 +639,9 @@ class QBCItemCore
 		{
 			var createOpt = {
 				flags: itemInfo.byte_flags,
-				item_type: itemInfo.item_type
+				item_type: itemInfo.item_type,
+				byte_type: itemInfo.byte_type,
+				wor_array: itemInfo.wor_array
 			};
 
 			if (opt)
@@ -642,6 +720,11 @@ class QBCItemCore
 
 		switch (token)
 		{
+			// 0x00: End the script!
+			case QBC.constants.ESCRIPTTOKEN_ENDOFFILE:
+				this.stopRead = true;
+				break;
+
 			// 0x03: Start struct
 			case QBC.constants.ESCRIPTTOKEN_STARTSTRUCT:
 				qbItem = QBC.CreateClass("Struct");
@@ -678,6 +761,15 @@ class QBCItemCore
 				this.stopRead = true;
 				break;
 
+			// Special case for ESCRIPTTOKEN_ENDOFLINENUMBER.
+			// These are used in THAW StructScripts.
+			case QBC.constants.ESCRIPTTOKEN_ENDOFLINENUMBER:
+				qbItem = QBC.CreateClass("ScriptToken");
+				this.AddChild(qbItem);
+				qbItem.ValueFromToken(token);
+				this.reader.UInt32();
+				break;
+
 			// The tokens below are single-token keywords and
 			// are handled solely by the ScriptToken class
 			case QBC.constants.ESCRIPTTOKEN_ENDOFLINE:
@@ -691,7 +783,6 @@ class QBCItemCore
 			case QBC.constants.ESCRIPTTOKEN_DOT:
 			case QBC.constants.ESCRIPTTOKEN_COLON:
 			case QBC.constants.ESCRIPTTOKEN_COMMA:
-			case QBC.constants.ESCRIPTTOKEN_KEYWORD_ENDSCRIPT:
 			case QBC.constants.ESCRIPTTOKEN_GREATERTHAN:
 			case QBC.constants.ESCRIPTTOKEN_GREATERTHANEQUAL:
 			case QBC.constants.ESCRIPTTOKEN_LESSTHAN:
@@ -702,17 +793,31 @@ class QBCItemCore
 			case QBC.constants.ESCRIPTTOKEN_NOTEQUAL:
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_ALLARGS:
 			case QBC.constants.ESCRIPTTOKEN_ARG:
+			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOM_RANGE:
+			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOM_RANGE2:
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_BEGIN:
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_REPEAT:
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_BREAK:
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RETURN:
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOMFLOAT:
-			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOM_RANGE:
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOMINTEGER:
 			case QBC.constants.ESCRIPTTOKEN_ARGUMENTPACK:
 				qbItem = QBC.CreateClass("ScriptToken");
 				this.AddChild(qbItem);
 				qbItem.ValueFromToken(token);
+				break;
+
+			// 0x24: End function
+			// For THUG files, this will end the current script.
+			case QBC.constants.ESCRIPTTOKEN_KEYWORD_ENDSCRIPT:
+				if (this.job.IsTHUG() && this.InScript())
+					this.stopRead = true;
+				else
+				{
+					qbItem = QBC.CreateClass("ScriptToken");
+					this.AddChild(qbItem);
+					qbItem.ValueFromToken(token);
+				}
 				break;
 
 			// 0x16: QBKey
@@ -737,7 +842,9 @@ class QBCItemCore
 				break;
 
 			// 0x1B: String
+			// 0x1C: Local String
 			case QBC.constants.ESCRIPTTOKEN_STRING:
+			case QBC.constants.ESCRIPTTOKEN_LOCALSTRING:
 				qbItem = QBC.CreateClass("String");
 				this.AddChild(qbItem);
 				qbItem.ProcessData();
@@ -776,6 +883,22 @@ class QBCItemCore
 				}
 
 				this.stopRead = true;
+				break;
+
+			// 0x23: Script
+			case QBC.constants.ESCRIPTTOKEN_KEYWORD_SCRIPT:
+				qbItem = QBC.CreateClass("Script");
+				this.AddChild(qbItem);
+				qbItem.ProcessData();
+				break;
+
+			// 0x2B: Symbol entry
+			// Mostly used in THUG files. Debug for a QBKey.
+			case QBC.constants.ESCRIPTTOKEN_CHECKSUM_NAME:
+				var symbolKey = QBC.constants.Keys.FromKey("0x" + this.reader.UInt32().toString(16).padStart(8, "0"));
+				var symbolText = this.reader.TermString();
+
+				QBC.AddKey(symbolKey, symbolText);
 				break;
 
 			// 0x2E: Jump
@@ -841,20 +964,13 @@ class QBCItemCore
 				break;
 
 			// 0x3E: Case
-			case QBC.constants.ESCRIPTTOKEN_KEYWORD_CASE:
-				qbItem = QBC.CreateClass("ScriptToken");
-				qbItem.value = "case"
-				this.AddChild(qbItem);
-
-				this.reader.UInt8();		// Shortjump token
-				this.reader.UInt16();		// Shortjump amount
-
-				break;
-
 			// 0x3F: Default
+			case QBC.constants.ESCRIPTTOKEN_KEYWORD_CASE:
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_DEFAULT:
 				qbItem = QBC.CreateClass("ScriptToken");
-				qbItem.value = "default"
+				qbItem.value =
+					token == QBC.constants.ESCRIPTTOKEN_CASE ?
+						"case" : "default";
 				this.AddChild(qbItem);
 
 				this.reader.UInt8();		// Shortjump token
@@ -936,7 +1052,41 @@ class QBCItemCore
 		if (this.InPackedStruct())
 			return false;
 
-		// Yup
+		// If our parent is a structure, then
+		// we need to see if this is a fancy single-line struct.
+
+		if (this.parent && this.parent.HasOnlySingleLineChildren())
+			return false;
+
+		return true;
+	}
+
+	//-----------------------
+	// Every child in this element
+	// is a single-line object.
+	//-----------------------
+
+	HasOnlySingleLineChildren()
+	{
+		if (this.children.length <= 0)
+			return true;
+
+		// We don't want a gigantic single line.
+		// We'll cap it off at a certain point.
+
+		var numSingles = 0;
+
+		// If we have one multi-line child, return false
+		for (const child of this.children)
+		{
+			if (!child.IsSingleLine())
+				return false;
+
+			numSingles ++;
+
+			if (numSingles >= MAX_SINGLE_LINE_ELEMENTS)
+				return false;
+		}
 
 		return true;
 	}
@@ -1097,6 +1247,32 @@ class QBCItemCore
 			//this.Fail(token.type + " token found outside of 'switch' statement.");
 			//return false;
 		//}
+
+		// Fail for cases outside of switch statement
+		if (token.type == "case" && !this.IsSwitch())
+		{
+			this.Fail(token.type + " token found outside of 'switch' statement.");
+			return false;
+		}
+
+		// Possible fail for defaults outside of switch statement
+		if ((token.type == "default") && !this.IsSwitch())
+		{
+			var defaultAllowed = false;
+			var prevToken = this.lexer.NextToken(-1);
+			var nextToken = this.lexer.NextToken(1);
+
+			if (prevToken && (prevToken.type == '=' || prevToken.type == "keyword"))
+				defaultAllowed = true;
+			if (nextToken && (nextToken.type == '='))
+				defaultAllowed = true;
+
+			if (defaultAllowed)
+				return true;
+
+			this.Fail(token.type + " token found outside of 'switch' statement.");
+			return false;
+		}
 
 		// Fail for else and elseif keywords outside of if statement
 		if ((token.type == "else" || token.type == "elseif") && !this.IsConditional())
@@ -1385,36 +1561,19 @@ class QBCItemCore
 				// If in a script, assume it's a token of some sort!
 				if (this.IsScript() || this.InScriptBody())
 				{
-					if (theToken.type === "default" && !this.IsSwitch())
-					{
-						qbItem = QBC.CreateClass("QBKey");
-						qbItem.value = theToken.value;
-						qbItem.id = id;
-					}
-					else
-					{
-						if (!this.ScriptTokenAllowed(theToken))
-							return false;
+					if (!this.ScriptTokenAllowed(theToken))
+						return false;
 
-						qbItem = QBC.CreateClass("ScriptToken");
-						qbItem.value = theToken.type;
-						this.AddChild(qbItem);
-					}
+					qbItem = QBC.CreateClass("ScriptToken");
+					qbItem.value = theToken.type;
+					this.AddChild(qbItem);
 					return true;
 				}
 
 				// Otherwise, ???
 				else
 				{
-					// if default key in a struct
-					if (theToken.type === "default")
-					{
-						qbItem = QBC.CreateClass("QBKey");
-						qbItem.value = theToken.value;
-						qbItem.id = id;
-					}
-					else
-						this.Fail("Keyword " + id + " had unknown value type: " + theToken.type + " (" + theToken.value + ")");
+					this.Fail("Keyword " + id + " had unknown value type: " + theToken.type + " (" + theToken.value + ")");
 					return false;
 				}
 
@@ -1719,7 +1878,7 @@ class QBCItemCore
 
 		// Top-level global item, we have no parents
 		if (this.IsTopLevel())
-			finalFlags |= QBC.constants.FLAG_GLOBALITEM;
+			finalFlags |= this.job.IsTHAW() ? QBC.constants.FLAG_GLOBALITEM_WPC : QBC.constants.FLAG_GLOBALITEM;
 
 		// We are a child of a parent
 		else if (this.parent)
@@ -1730,6 +1889,14 @@ class QBCItemCore
 				wasGH3Child = true;
 				finalFlags |= QBC.constants.FLAG_STRUCT_GH3;
 				finalFlags |= this.GetItemInfoType();
+			}
+
+			// THAW items use their item type as part of their flags.
+			else if (this.job.IsTHAW())
+			{
+				wasGH3Child = true;
+				finalFlags |= QBC.constants.FLAG_HASPARENT;
+				finalFlags |= (this.GetItemInfoType() << 1);
 			}
 
 			// GHWT child-items store their flag after.

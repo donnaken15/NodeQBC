@@ -137,8 +137,8 @@ class KeyHandler
 
 	ToKey(txt, reversed = false)
 	{
-		//~ if (global.GHSDK)
-			//~ return Checksums.Make(txt, reversed);
+		if (global.GHSDK)
+			return Checksums.Make(txt, reversed);
 
 		// Number to string!
 		if (typeof(txt) == "number")
@@ -193,14 +193,16 @@ class KeyHandler
 
 	FromKey(inValue)
 	{
-		//~ if (global.GHSDK)
-			//~ return Checksums.Lookup(inValue);
+		if (global.GHSDK)
+			return Checksums.Lookup(inValue);
 
 		if (typeof(inValue) == "number")
 			inValue = "0x" + inValue.toString(16).padStart(8, "0");
 
-		if (this.keyDict[inValue])
-			return this.keyDict[inValue];
+		var tlc = inValue.toLowerCase();
+
+		if (this.keyDict[tlc])
+			return this.keyDict[tlc];
 
 		return inValue;
 	}
@@ -211,9 +213,6 @@ class KeyHandler
 
 	AddKey(hexValue, stringValue)
 	{
-		if (stringValue.startsWith("c:/gh3")) // not good debug string
-			return;
-
 		if (typeof(hexValue) == 'number')
 			hexValue = "0x" + (hexValue.toString(16).padStart(8, "0"));
 
@@ -241,18 +240,13 @@ class KeyHandler
 				continue;
 
 			var spl = line.split(" ");
-			var hexKey = spl.shift();
+			var hexKey = spl.shift().toLowerCase();
+
+			if (global.GHSDK)
+				Checksums.keys[hexKey] = spl.join(" ");
 
 			this.AddKey(hexKey, spl.join(" "));
 		}
-	}
-
-	//-----------------------
-	// Pull keys from a .txt file.
-	//-----------------------
-
-	PullTXTKeys(fPath)
-	{
 	}
 
 	//-----------------------
@@ -265,6 +259,7 @@ class KeyHandler
 		if (depth > 2)
 			return;
 
+		// zedek the javascript wizard padding an empty string
 		QBC.Debug((" ".repeat(depth*2)) + "Pulling keys from " + keyDir + "...");
 
 		if (!fs.existsSync(keyDir))
@@ -291,12 +286,8 @@ class KeyHandler
 
 			var ext = spl[0].toLowerCase();
 
-			if (ext == 'dbg')
+			if (ext == 'dbg' || ext == 'txt')
 				this.PullDBGKeys(fPath);
-			else if (ext == 'txt')
-				this.PullDBGKeys(fPath);
-
-				//~ this.PullTXTKeys(fPath);
 		}
 	}
 }

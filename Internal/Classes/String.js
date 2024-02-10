@@ -32,6 +32,7 @@ class QBCString extends ItemCore
 		{
 			var strLength = this.reader.UInt32();
 
+			// THAW does not store widestring as wide characters. Apparently.
 			if (this.wide)
 			{
 				var wCharCount = Math.floor((strLength-2) / 2);
@@ -92,7 +93,7 @@ class QBCString extends ItemCore
 
 			this.reader.Seek(this.ptr_stringStart);
 
-			if (this.wide)
+			if (this.wide && !this.job.IsTHAW())
 				this.value = this.reader.TermWString();
 			else
 				this.value = this.reader.TermString();
@@ -176,9 +177,14 @@ class QBCString extends ItemCore
 
 		// Prepend bytecode if in QBScript
 
+		var writeWide = (this.wide);
+
+		if (this.job.IsTHAW() && !inScript)
+			writeWide = false;
+
 		if (inScript)
 		{
-			if (this.wide)
+			if (writeWide)
 			{
 				this.writer.UInt8(QBC.constants.ESCRIPTTOKEN_WIDESTRING);
 				this.writer.UInt32((this.value.length+1) * 2);		// Including terminator!
@@ -190,7 +196,7 @@ class QBCString extends ItemCore
 			}
 		}
 
-		if (this.wide)
+		if (writeWide)
 		{
 			// APPARENTLY, widestrings in scripts are in a reverse
 			// endian from the script's normal endian.

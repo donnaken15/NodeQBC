@@ -129,6 +129,7 @@ class ArgumentHandler
 
 		var func = this[cmd.funcName];
 
+		// Compile command returns boolean based on success of the command to use as exit codes in batch/shell.
 		if (func)
 		{
 			var bound = func.bind(this);
@@ -224,7 +225,7 @@ class ArgumentHandler
 		// a set of options to use for the job.
 
 		var data = {
-			qbcOptions: {},
+			qbcOptions: {noKeyFiles: true},
 			comOptions: {},
 			sourceFiles: [],
 			outputPath: ""
@@ -313,11 +314,42 @@ class ArgumentHandler
 				// This uses .qb.xen as the extension.
 
 				var shorthand = path.basename(param).split(".")[0];
-				var outExten = isCompile ? ".qb.xen" : ".q";
+				var outExten = isCompile ? ".qb" : ".q";
 
 				var oPath = path.join( path.dirname(param), shorthand + outExten );
 
 				data.sourceFiles.push([param, oPath]);
+			}
+		}
+
+		// Ensure that platform extension exists for compiling files.
+		if (isCompile)
+		{
+			var exten = (data.comOptions.game && data.comOptions.game == "thaw") ? "wpc" : "xen";
+
+			for (var s=0; s<data.sourceFiles.length; s++)
+			{
+				var outPath = data.sourceFiles[s][1];
+				if (!outPath.toLowerCase().endsWith(exten))
+					data.sourceFiles[s][1] = outPath + "." + exten;
+			}
+		}
+
+		// If we haven't specified a game, attempt to use
+		// THAW for .wpc files.
+
+		else
+		{
+			if (!data.comOptions.game)
+			{
+				for (const sf of data.sourceFiles)
+				{
+					if (sf[0].endsWith("wpc"))
+					{
+						data.comOptions.game = "thaw";
+						break;
+					}
+				}
 			}
 		}
 
@@ -404,20 +436,21 @@ class ArgumentHandler
 		console.log("");
 
 		console.log("Compiler Options:");
-		console.log("  --verbose	-v")
-		console.log("	  Enables verbose debugging.")
-		console.log("  --silent		-s")
-		console.log("	  Prevents all logging, compiles silently.")
-		console.log("  --output		-o")
-		console.log("	  Specifies an output file to use for the compiled result.")
-		console.log("	  This command ONLY works when compiling a single file.")
-		console.log("  --game		-g")
-		console.log("	  Sets the game to compile for. Specify the game after.")
-		console.log("	  By default, 'ghwt' is used for the game type.")
-		console.log("	  The following game ID's are supported:")
-		console.log("		  ghwt");
-		console.log("		  gh3");
-		//~ console.log("		  thaw");
+		console.log("  --verbose    -v");
+		console.log("     Enables verbose debugging.");
+		console.log("  --silent     -s");
+		console.log("     Prevents all logging, compiles silently.");
+		console.log("  --output     -o");
+		console.log("     Specifies an output file to use for the compiled result.");
+		console.log("     This command ONLY works when compiling a single file.");
+		console.log("  --game       -g");
+		console.log("     Sets the game to compile for. Specify the game after.");
+		console.log("     By default, 'ghwt' is used for the game type.");
+		console.log("     The following game ID's are supported:");
+		console.log("         ghwt");
+		console.log("         gh3");
+		console.log("         thaw");
+		console.log("         thug2");
 		console.log("");
 		console.log("  A compiler option can come before or after the INPUT.");
 		console.log("");

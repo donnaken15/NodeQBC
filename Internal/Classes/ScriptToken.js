@@ -40,6 +40,14 @@ class QBCScriptToken extends ItemCore
 				this.value = "newline";
 				break;
 
+			// Special case for THAW structscript. These
+			// are used internally for debug things, but we
+			// don't care. They function as newlines.
+
+			case QBC.constants.ESCRIPTTOKEN_ENDOFLINENUMBER:
+				this.value = "newline";
+				break;
+
 			case QBC.constants.ESCRIPTTOKEN_EQUALS:
 				this.value = "=";
 				break;
@@ -132,6 +140,14 @@ class QBCScriptToken extends ItemCore
 				this.value = ">=";
 				break;
 
+			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOM_RANGE:
+				this.value = "randomrange";
+				break;
+
+			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOM_RANGE2:
+				this.value = "randomrange2";
+				break;
+
 			case QBC.constants.ESCRIPTTOKEN_LESSTHAN:
 				this.value = "<";
 				break;
@@ -150,10 +166,6 @@ class QBCScriptToken extends ItemCore
 
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_ALLARGS:
 				this.value = "<...>";
-				break;
-
-			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOM_RANGE:
-				this.value = "randomrange";
 				break;
 
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_RANDOMINTEGER:
@@ -184,7 +196,7 @@ class QBCScriptToken extends ItemCore
 	WriteText()
 	{
 		var val = this.GetValueText();
-		
+
 		if (val.startsWith("endsw")) console.log("COME ON");
 		switch (val)
 		{
@@ -202,19 +214,15 @@ class QBCScriptToken extends ItemCore
 				this.job.AddText(val);
 				break;
 			case "repeat":
+			case "elseif":
+			case "case":
 				this.job.SubIndent();
 				this.job.AddText(val + " ");
 				break;
 			case "default":
+			case "else":
 				this.job.SubIndent();
 				this.job.AddText(val);
-				this.job.AddIndent();
-				break;
-			case "case":
-			case "else":
-			case "elseif":
-				this.job.SubIndent();
-				this.job.AddText(val + " ");
 				this.job.AddIndent();
 				break;
 

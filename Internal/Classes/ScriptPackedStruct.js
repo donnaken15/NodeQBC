@@ -170,6 +170,16 @@ class QBScriptPackedStruct extends QBCStruct
 			return;
 		}
 
+		if (jobResults.errors && jobResults.errors.length)
+		{
+			for (const err of jobResults.errors)
+				console.error(err);
+
+			this.Fail("PackedStruct had errors, aborting.");
+			return;
+		}
+
+
 		QBC.KillJob();
 
 		var jobData = jobResults.GetData();
