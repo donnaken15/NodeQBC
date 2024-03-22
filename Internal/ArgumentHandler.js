@@ -225,7 +225,7 @@ class ArgumentHandler
 		// a set of options to use for the job.
 
 		var data = {
-			qbcOptions: {noKeyFiles: true},
+			qbcOptions: {},
 			comOptions: {},
 			sourceFiles: [],
 			outputPath: ""

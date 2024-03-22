@@ -401,7 +401,8 @@ class QBCJob
 
 	StartLine()
 	{
-		this.AddText(" ".repeat(this.GetIndent() * 4));
+		if (this.GetIndent() > 0)
+			this.AddText(" ".repeat(this.GetIndent() * 4));
 	}
 
 	//-----------------------
