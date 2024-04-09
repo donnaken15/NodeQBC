@@ -213,12 +213,15 @@ class KeyHandler
 
 	AddKey(hexValue, stringValue)
 	{
+		if (stringValue.startsWith("c:/gh3"))
+			return;
+		
 		if (typeof(hexValue) == 'number')
 			hexValue = "0x" + (hexValue.toString(16).padStart(8, "0"));
 
 		var tlc = hexValue.toLowerCase();
 
-		if (!this.keyDict[tlc])
+		if (!this.keyDict[tlc] || this.keyDict[tlc].startsWith("c:/gh3"))
 			this.keyDict[tlc] = stringValue;
 	}
 

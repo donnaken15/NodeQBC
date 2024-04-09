@@ -209,15 +209,15 @@ class QBCScriptToken extends ItemCore
 				this.job.AddText(val);
 				this.job.AddIndent();
 				break;
+			case "repeat":
+				this.job.SubIndent();
+				this.job.AddText(val + " ");
+				break;
 			case "endscript":
 				this.job.SubIndent();
 				this.job.AddText(val);
 				break;
-			case "repeat":
 			case "case":
-				this.job.SubIndent();
-				this.job.AddText(val + " ");
-				break;
 			case "elseif":
 				this.job.SubIndent();
 				this.job.AddText(val + " ");

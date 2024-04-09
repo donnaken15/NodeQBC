@@ -59,6 +59,8 @@ class QBCQBKey extends ItemCore
 				as_longkey = true;
 			if (valstr.indexOf('\\') >= 0)
 				as_longkey = true;
+			if (valstr.indexOf(':') >= 0)
+				as_longkey = true;
 
 			if (as_longkey)
 				this.job.AddText("`" + valstr + "`");

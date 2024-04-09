@@ -245,13 +245,16 @@ class QBCItemCore
 			return "";
 
 		var valstr = val.toString();
-		if (valstr.indexOf(" ") >= 0 || valstr.startsWith("0x"))
+		if (valstr.indexOf(" ") >= 0 ||
+			//valstr.indexOf(":") >= 1 || // wtf
+			//valstr.indexOf(".") >= 0 ||
+			valstr.startsWith("0x"))
 		{
 			// Try to look it up just in case.
 			var lookup = QBC.KeyToString(valstr);
 
 			if (lookup == valstr)
-				return '#\"' + valstr + '"';
+				return '#\"' + valstr.replace("\\", "\\\\") + '"';
 
 			return lookup;
 		}
@@ -969,7 +972,7 @@ class QBCItemCore
 			case QBC.constants.ESCRIPTTOKEN_KEYWORD_DEFAULT:
 				qbItem = QBC.CreateClass("ScriptToken");
 				qbItem.value =
-					token == QBC.constants.ESCRIPTTOKEN_CASE ?
+					token === 0x3E ? // WHY!!!!!!!!
 						"case" : "default";
 				this.AddChild(qbItem);
 

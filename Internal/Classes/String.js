@@ -111,7 +111,7 @@ class QBCString extends ItemCore
 	EscapedText()
 	{
 		var chr = this.wide ? "\"" : "'";
-		return this.value.replace(new RegExp(chr, "g"), '\\$&');
+		return this.value.replace(new RegExp("["+chr+"\\\\]", "g"), '\\$&');
 	}
 
 	//--==--==--==--==--==--==--==--==--==--==--==--==--==--==--==
